@@ -27,7 +27,7 @@ def calculate_canvas_size(points):
     print("Canvas dimenstion: ", canvas_width, "x", canvas_height)
 
     return canvas_width, canvas_height
-
+    
 def calculate_epsilon(canvas_width, canvas_height, points):
     max_distance = 0
     for i in range(len(points) - 1):
@@ -72,16 +72,15 @@ def ramer_douglas_peucker(points, epsilon):
     return simplified
 
 def draw_line(canvas, points, color):
-    # Draw line segments
+
     for i in range(len(points) - 1):
         x1, y1 = points[i]
         x2, y2 = points[i + 1]
         canvas.create_line(x1, y1, x2, y2, fill=color, width=1.5)
     
-    # Draw circles at each point
     for point in points:
         x, y = point
-        canvas.create_oval(x - 3, y - 3, x + 3, y + 3, fill="red")  # Adjust the size and color as needed
+        canvas.create_oval(x - 3, y - 3, x + 3, y + 3, fill="red") 
 
 # All together
 def appFunction(points, canvas_width, canvas_height):
