@@ -46,13 +46,12 @@ def perpendicular_distance(point, line_start, line_end):
     
     return nominator / denominator
 
-# Example usage
-
+# Exemple
 points = [(1, 1), (3, 3), (4, 4), 
           (5, 5), (6, 6), (7, 200), 
           (15, 100), (16, 16), (100, 100), (150, 10), (180, 200), (210, 120), (260, 280)]
 
-epsilon = 280
+epsilon = 100
 
 simplified_points = ramer_douglas_peucker(points, epsilon)
 print("Pontos originais:", points)
