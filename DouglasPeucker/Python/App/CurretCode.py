@@ -1,7 +1,6 @@
 import tkinter as tk
 import random
 import psycopg2
-# from datetime import datetime
 
 def criar_conexao():
     try:
@@ -172,7 +171,5 @@ def mainProgram():
         else:
             executionTime += 1
             print(f"Execution time incremented to {executionTime}\n")
-
-
 
 mainProgram()

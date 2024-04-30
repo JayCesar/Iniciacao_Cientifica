@@ -1,5 +1,21 @@
 import tkinter as tk
 import random
+import psycopg2
+
+def criar_conexao():
+    try:
+        # Estabelece a conexão com o banco de dados PostgreSQL
+        conexao = psycopg2.connect(database="rdp_storage",
+                                   host="localhost",
+                                   user="postgres",
+                                   password="123456",
+                                   port="5432")
+        print("Conexão PostgreSQL estabelecida com sucesso.\n")
+        return conexao  # Retorna a conexão estabelecida
+
+    except psycopg2.Error as e:
+        print("Erro ao conectar ao banco de dados PostgreSQL:", e)
+        return None  # Retorna None se a conexão falhar
 
 def generate_random_points(dimension):
     points = []
@@ -49,28 +65,46 @@ def perpendicular_distance(point, line_start, line_end):
     
     return nominator / denominator
 
-def insert_non_simplified_points(points, conn):
-    cur = conn.cursor()
-    # Delete data first
-    cur.execute("DELETE FROM simplified_points")
-    cur.execute("DELETE FROM non_simplified_points")
-    for point in points:
-        x, y = point
-        sql = "INSERT INTO non_simplified_points (nome, ponto) VALUES (%s, ST_SetSRID(ST_MakePoint(%s, %s), 4326))"
-        data = (f"Point ({x}, {y})", x, y)
-        cur.execute(sql, data)
-    conn.commit()
-    cur.close()
+def create_non_simplified_table(table_name):
+    try:
+        conn = criar_conexao()
+        cur = conn.cursor()
 
-def insert_simplified_points(simplified_points, non_simplified_id, conn):
-    cur = conn.cursor()
-    for point in simplified_points:
-        x, y = point
-        sql = "INSERT INTO simplified_points (simplified_nome, simplified_ponto, non_simplified_id) VALUES (%s, ST_SetSRID(ST_MakePoint(%s, %s), 4326), %s)"
-        data = (f"Simplified Point ({x}, {y})", x, y, non_simplified_id)
-        cur.execute(sql, data)
-    conn.commit()
-    cur.close()
+        # Call the stored procedure function
+        cur.execute("SELECT create_non_simplified_table(%s)", (table_name,))
+        conn.commit()
+
+        print(f"Table '{table_name}' created successfully.\n")
+    except (Exception, psycopg2.DatabaseError) as error:
+        print(f"Error creating table: {error}")
+    finally:
+        if conn is not None:
+            conn.close()
+
+def create_simplified_table(simplified_table_name:str, non_simplified_table_name:str)->None:
+    try:
+        conn = criar_conexao()
+        cur = conn.cursor()
+        
+        # Call the stored procedure function
+        cur.execute("SELECT create_simplified_table(%s, %s)", (simplified_table_name, non_simplified_table_name))
+        conn.commit()
+
+        print(f"Table '{simplified_table_name}' table created successfully.\n")
+    except (Exception, psycopg2.DatabaseError) as error:
+        print(f"Error creating table: {error}")
+    finally:
+        if conn is not None:
+            conn.close()
+
+def calculate_epsilon(canvas_width, canvas_height, points):
+    max_distance = 0
+    for i in range(len(points) - 1):
+        x1, y1 = points[i]
+        x2, y2 = points[i + 1]
+        distance = ((y2 - y1)**2 + (x2 - x1)**2)**0.5
+        max_distance = max(max_distance, distance)
+    return max(canvas_width, canvas_height) * 0.005 * (max_distance / (len(points) - 1)) 
 
 def calculate_canvas_size(points):
     min_x = min(point[0] for point in points)
@@ -85,17 +119,6 @@ def calculate_canvas_size(points):
 
     return canvas_width, canvas_height
 
-def calculate_epsilon(canvas_width, canvas_height, points):
-
-    max_distance = 0
-    for i in range(len(points) - 1):
-        x1, y1 = points[i]
-        x2, y2 = points[i + 1]
-        distance = ((y2 - y1)**2 + (x2 - x1)**2)**0.5
-        max_distance = max(max_distance, distance)
-    return max(canvas_width, canvas_height) * 0.005 * (max_distance / (len(points) - 1)) 
-
-# This data changes as the number of points
 def draw_line(canvas, points, color):
     # Draw line segments
     for i in range(len(points) - 1):
@@ -108,45 +131,43 @@ def draw_line(canvas, points, color):
         x, y = point
         canvas.create_oval(x - 3, y - 3, x + 3, y + 3, fill="red")  # Adjust the size and color as needed
 
-def appFunction(points, canvas_width, canvas_height, conn):
+def appFunction(points, canvas_width, canvas_height, executionTime):
+
     epsilon = calculate_epsilon(canvas_width, canvas_height, points)
 
     simplified_points = ramer_douglas_peucker(points, epsilon)
 
-    # Insert non-simplified points into the database
-    insert_non_simplified_points(points, conn)
+    user_input_table_name = input("Enter a name for the non simplified points table: ")
 
-    # Retrieve the ID of the last inserted non-simplified point
-    cur = conn.cursor()
-    cur.execute("SELECT MAX(id) FROM non_simplified_points")
-    non_simplified_id = cur.fetchone()[0]
-    cur.close()
+    non_simplified_table_name = "non_simplified_points_path_" + str(executionTime) + "_" + user_input_table_name
+    create_non_simplified_table(non_simplified_table_name)
+    # modified_string = non_simplified_table_name.replace("non_simplified_points", "")
+    create_simplified_table("simplified_points", non_simplified_table_name)
 
-    # Insert simplified points with reference to the non-simplified point
-    insert_simplified_points(simplified_points, non_simplified_id, conn)
-
-    # Create the Tkinter window
     root = tk.Tk()
     root.title("Simplified Line with Points")
 
-    # Create a canvas widget
     canvas = tk.Canvas(root, width=canvas_width, height=canvas_height)
     canvas.pack()
 
-    # Draw original and simplified lines and points
+   
     draw_line(canvas, points, "black")
     draw_line(canvas, simplified_points, "blue")
-    print(points)
 
-    # Run the Tkinter event loop
+   
     root.mainloop()
 
-# Define remaining functions (calculate_canvas_size, calculate_epsilon, draw_line) as per the previous code
+def runApp():
 
-# Example usage:
-# points = generate_random_points(300)
-# canvas_width, canvas_height = calculate_canvas_size(points)
-# appFunction(points, canvas_width, canvas_height, conn)
+    executionTime = 1
 
-# Close the database connection at the end
-# conn.close()
+    while True:
+        points = generate_random_points(300)
+        canvas_width, canvas_height = calculate_canvas_size(points)
+        appFunction(points, canvas_width, canvas_height, str(executionTime))
+        user_input_app = input("More data? (y/n): ").strip().lower()
+        if user_input_app == 'n':
+            break
+        else:
+            executionTime += 1
+            print(f"Execution time incremented to {executionTime}\n")
