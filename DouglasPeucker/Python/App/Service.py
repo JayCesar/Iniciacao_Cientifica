@@ -105,14 +105,21 @@ def create_simplified_table(simplified_table_name:str, non_simplified_table_name
         if conn is not None:
             conn.close()
 
-def calculate_epsilon(canvas_width, canvas_height, points):
+def calculate_epsilon(canvas_width, canvas_height, points, rangeValue):
     max_distance = 0
+    if rangeValue <= 5: 
+        rangeValueTreated = 0.005
+    elif rangeValue > 5 and rangeValue <= 50:
+        rangeValueTreated = 0.0005
+    else:
+        rangeValueTreated = 0.00005
+  
     for i in range(len(points) - 1):
         x1, y1 = points[i]
         x2, y2 = points[i + 1]
         distance = ((y2 - y1)**2 + (x2 - x1)**2)**0.5
         max_distance = max(max_distance, distance)
-    return max(canvas_width, canvas_height) * 0.005 * (max_distance / (len(points) - 1)) 
+    return max(canvas_width, canvas_height) * rangeValueTreated * (max_distance / (len(points) - 1)) 
 
 def calculate_canvas_size(points):
     min_x = min(point[0] for point in points)
@@ -139,9 +146,9 @@ def draw_line(canvas, points, color):
         x, y = point
         canvas.create_oval(x - 3, y - 3, x + 3, y + 3, fill="red")  # Adjust the size and color as needed
 
-def appFunction(points, canvas_width, canvas_height, executionTime):
+def appFunction(points, canvas_width, canvas_height, executionTime, rangeValue):
 
-    epsilon = calculate_epsilon(canvas_width, canvas_height, points)
+    epsilon = calculate_epsilon(canvas_width, canvas_height, points, rangeValue)
 
     simplified_points = ramer_douglas_peucker(points, epsilon)
 
@@ -172,19 +179,19 @@ def runApp():
 
         try:
             dimension = int(dimension_str)
-            value = int(range_str)
+            rangeValue = int(range_str)
             print(f"\nDimension size: {dimension}")
-            print(f"Range: {value}")
+            print(f"Range: {rangeValue}")
         except ValueError:
             print("\nInvalid input. Please enter a valid integer.")
 
-        points = generate_random_points(dimension, value)
+        points = generate_random_points(dimension, rangeValue)
         canvas_width, canvas_height = calculate_canvas_size(points)
-        appFunction(points, canvas_width, canvas_height, str(executionTime))
+        appFunction(points, canvas_width, canvas_height, str(executionTime), rangeValue)
         user_input_app = input("\nMore data to store? (y/n): ").strip().lower()
         if user_input_app == 'n':
             print("\nApp finished simplified_points\n")
             break
         else:
             executionTime += 1
-            print(f"Execution time incremented to {executionTime}\n")
+            print(f"\nExecution time incremented to {executionTime}\n")
