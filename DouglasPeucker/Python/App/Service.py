@@ -10,17 +10,19 @@ def criar_conexao():
                                    user="postgres",
                                    password="123456",
                                    port="5432")
-        print("Conexão PostgreSQL estabelecida com sucesso.\n")
+        print("\n--------------------------------------------")
+        print("\nPostgreSQL connection successfully established.")
+        print("\n--------------------------------------------\n")
         return conexao  # Retorna a conexão estabelecida
 
     except psycopg2.Error as e:
-        print("Erro ao conectar ao banco de dados PostgreSQL:", e)
+        print("Error connecting to PostgreSQL database:", e)
         return None  # Retorna None se a conexão falhar
 
-def generate_random_points(dimension):
+def generate_random_points(dimension, value):
     points = []
     prev_x = 0
-    for i in range(10):
+    for i in range(value):
         x = prev_x + random.randint(10, 100)  
         y = random.randint(0, dimension)
         points.append((x, y))
@@ -65,7 +67,7 @@ def perpendicular_distance(point, line_start, line_end):
     
     return nominator / denominator
 
-def create_non_simplified_table(table_name):
+def create_non_simplified_table(table_name, non_simplified_points):
     try:
         conn = criar_conexao()
         cur = conn.cursor()
@@ -74,14 +76,16 @@ def create_non_simplified_table(table_name):
         cur.execute("SELECT create_non_simplified_table(%s)", (table_name,))
         conn.commit()
 
-        print(f"Table '{table_name}' created successfully.\n")
+        print(f"Table '{table_name}' created successfully.")
+        print("\nNon simplified points: \n")
+        print(non_simplified_points)
     except (Exception, psycopg2.DatabaseError) as error:
         print(f"Error creating table: {error}")
     finally:
         if conn is not None:
             conn.close()
 
-def create_simplified_table(simplified_table_name:str, non_simplified_table_name:str)->None:
+def create_simplified_table(simplified_table_name:str, non_simplified_table_name:str, simplified_points)->None:
     try:
         conn = criar_conexao()
         cur = conn.cursor()
@@ -90,7 +94,11 @@ def create_simplified_table(simplified_table_name:str, non_simplified_table_name
         cur.execute("SELECT create_simplified_table(%s, %s)", (simplified_table_name, non_simplified_table_name))
         conn.commit()
 
-        print(f"Table '{simplified_table_name}' table created successfully.\n")
+        modified_table = non_simplified_table_name.replace("non_simplified_points_", "simplified_points_")
+
+        print(f"Table '{modified_table}' created successfully.\n")
+        print("Simplified points: \n")
+        print(simplified_points)
     except (Exception, psycopg2.DatabaseError) as error:
         print(f"Error creating table: {error}")
     finally:
@@ -137,12 +145,11 @@ def appFunction(points, canvas_width, canvas_height, executionTime):
 
     simplified_points = ramer_douglas_peucker(points, epsilon)
 
-    user_input_table_name = input("Enter a name for the non simplified points table: ")
+    user_input_table_name = input("\nEnter a name for the non simplified points table: ")
 
     non_simplified_table_name = "non_simplified_points_path_" + str(executionTime) + "_" + user_input_table_name
-    create_non_simplified_table(non_simplified_table_name)
-    # modified_string = non_simplified_table_name.replace("non_simplified_points", "")
-    create_simplified_table("simplified_points", non_simplified_table_name)
+    create_non_simplified_table(non_simplified_table_name, points)
+    create_simplified_table("simplified_points", non_simplified_table_name, simplified_points)
 
     root = tk.Tk()
     root.title("Simplified Line with Points")
@@ -150,10 +157,8 @@ def appFunction(points, canvas_width, canvas_height, executionTime):
     canvas = tk.Canvas(root, width=canvas_width, height=canvas_height)
     canvas.pack()
 
-   
     draw_line(canvas, points, "black")
     draw_line(canvas, simplified_points, "blue")
-
    
     root.mainloop()
 
@@ -162,11 +167,23 @@ def runApp():
     executionTime = 1
 
     while True:
-        points = generate_random_points(300)
+        dimension_str = input("\nWhat is the dimension size? ")
+        range_str = input("\nWhat is the range? ")
+
+        try:
+            dimension = int(dimension_str)
+            value = int(range_str)
+            print(f"\nDimension size: {dimension}")
+            print(f"Range: {value}")
+        except ValueError:
+            print("\nInvalid input. Please enter a valid integer.")
+
+        points = generate_random_points(dimension, value)
         canvas_width, canvas_height = calculate_canvas_size(points)
         appFunction(points, canvas_width, canvas_height, str(executionTime))
-        user_input_app = input("More data? (y/n): ").strip().lower()
+        user_input_app = input("\nMore data to store? (y/n): ").strip().lower()
         if user_input_app == 'n':
+            print("\nApp finished simplified_points\n")
             break
         else:
             executionTime += 1
