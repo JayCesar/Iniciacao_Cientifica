@@ -3,7 +3,7 @@ import BdConfig
 
 conn = BdConfig.criar_conexao()
 
-points = ServiceFunctions.generate_random_points(100)
+points = ServiceFunctions.generate_random_points(200)
 
 # Calculate canvas size dynamically
 canvas_width, canvas_height = ServiceFunctions.calculate_canvas_size(points)
