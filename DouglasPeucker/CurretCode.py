@@ -3,14 +3,20 @@ import random
 import psycopg2
 # from datetime import datetime
 
-# Establish a connection to your PostgreSQL database
-conn = psycopg2.connect(
-    database="rdp_storage",
-    host="localhost",
-    user="postgres",
-    password="123456",
-    port="5432"
-)
+def criar_conexao():
+    try:
+        # Estabelece a conexão com o banco de dados PostgreSQL
+        conexao = psycopg2.connect(database="rdp_storage",
+                                   host="localhost",
+                                   user="postgres",
+                                   password="123456",
+                                   port="5432")
+        print("Conexão PostgreSQL estabelecida com sucesso.\n")
+        return conexao  # Retorna a conexão estabelecida
+
+    except psycopg2.Error as e:
+        print("Erro ao conectar ao banco de dados PostgreSQL:", e)
+        return None  # Retorna None se a conexão falhar
 
 def generate_random_points(dimension):
     points = []
@@ -60,70 +66,37 @@ def perpendicular_distance(point, line_start, line_end):
     
     return nominator / denominator
 
-def insert_non_simplified_points(conn, points, table_name, executionTime):
-    cur = conn.cursor()
+def create_non_simplified_table(table_name):
+    try:
+        conn = criar_conexao()
+        cur = conn.cursor()
 
-    # Construct the non-simplified table name
-    non_simplified_table_name = f"non_simplified_points_path_{executionTime}_{table_name}"
+        # Call the stored procedure function
+        cur.execute("SELECT create_non_simplified_table(%s)", (table_name,))
+        conn.commit()
 
-    # Create the non-simplified points table if it doesn't exist
-    create_non_simplified_table_sql = f"""
-        CREATE TABLE IF NOT EXISTS {non_simplified_table_name} (
-            id SERIAL PRIMARY KEY,
-            nome VARCHAR(255),
-            ponto geometry(Point, 4326)
-        );
-    """
-    cur.execute(create_non_simplified_table_sql)
-    conn.commit()
+        print(f"Table '{table_name}' created successfully.\n")
+    except (Exception, psycopg2.DatabaseError) as error:
+        print(f"Error creating table: {error}")
+    finally:
+        if conn is not None:
+            conn.close()
 
-    # Insert points into the non-simplified points table
-    for point in points:
-        x, y = point
-        insert_point_sql = f"INSERT INTO {non_simplified_table_name} (nome, ponto) VALUES (%s, ST_SetSRID(ST_MakePoint(%s, %s), 4326))"
-        data = (f"Point ({x}, {y})", x, y)
-        cur.execute(insert_point_sql, data)
-    conn.commit()
+def create_simplified_table(simplified_table_name:str, non_simplified_table_name:str)->None:
+    try:
+        conn = criar_conexao()
+        cur = conn.cursor()
+        
+        # Call the stored procedure function
+        cur.execute("SELECT create_simplified_table(%s, %s)", (simplified_table_name, non_simplified_table_name))
+        conn.commit()
 
-    cur.close()
-
-    print(points)
-
-    return non_simplified_table_name
-
-def insert_simplified_points(conn, simplified_points, non_simplified_table_name, non_simplified_id):
-    cur = conn.cursor()
-
-    result_string = non_simplified_table_name.replace("non_simplified_points_", "")
-
-    # Construct the simplified points table name
-    simplified_table_name = f"simplified_points_{result_string}"
-
-    # Create the simplified points table if it doesn't exist
-    create_simplified_table_sql = f"""
-        CREATE TABLE IF NOT EXISTS {simplified_table_name} (
-            id SERIAL PRIMARY KEY,
-            simplified_nome VARCHAR(255),
-            simplified_ponto geometry(Point, 4326),
-            non_simplified_id INT REFERENCES {non_simplified_table_name}(id)
-        );
-    """
-    cur.execute(create_simplified_table_sql)
-    conn.commit()
-
-    # Insert simplified points into the simplified points table
-    for point in simplified_points:
-        x, y = point
-        insert_simplified_point_sql = f"INSERT INTO {simplified_table_name} (simplified_nome, simplified_ponto, non_simplified_id) VALUES (%s, ST_SetSRID(ST_MakePoint(%s, %s), 4326), %s)"
-        data = (f"Simplified Point ({x}, {y})", x, y, non_simplified_id)
-        cur.execute(insert_simplified_point_sql, data)
-    conn.commit()
-
-    cur.close()
-
-    print(simplified_points)
-
-    return simplified_table_name
+        print(f"Table '{simplified_table_name}' table created successfully.\n")
+    except (Exception, psycopg2.DatabaseError) as error:
+        print(f"Error creating table: {error}")
+    finally:
+        if conn is not None:
+            conn.close()
 
 def calculate_epsilon(canvas_width, canvas_height, points):
     max_distance = 0
@@ -167,47 +140,39 @@ def appFunction(points, canvas_width, canvas_height, executionTime):
 
     user_input_table_name = input("Enter a name for the non simplified points table: ")
 
-    # Insert non-simplified points into the database
-    non_simplified_table_name = insert_non_simplified_points(conn, points, user_input_table_name, executionTime)
+    non_simplified_table_name = "non_simplified_points_path_" + str(executionTime) + "_" + user_input_table_name
+    create_non_simplified_table(non_simplified_table_name)
+    # modified_string = non_simplified_table_name.replace("non_simplified_points", "")
+    create_simplified_table("simplified_points", non_simplified_table_name)
 
-    # Retrieve the ID of the last inserted non-simplified point
-    cur = conn.cursor()
-    cur.execute(f"SELECT MAX(id) FROM {non_simplified_table_name}")
-    non_simplified_id = cur.fetchone()[0]
-    cur.close()
-
-    # Insert simplified points with reference to the non-simplified point
-    simplified_table_name = insert_simplified_points(conn, simplified_points, non_simplified_table_name, non_simplified_id)
-
-    # Create the Tkinter window
     root = tk.Tk()
     root.title("Simplified Line with Points")
 
-    # Create a canvas widget
     canvas = tk.Canvas(root, width=canvas_width, height=canvas_height)
     canvas.pack()
 
-    # Draw original and simplified lines and points
+   
     draw_line(canvas, points, "black")
     draw_line(canvas, simplified_points, "blue")
 
-    # Run the Tkinter event loop
+   
     root.mainloop()
 
-# Example usage:
-executionTime = 1
+def mainProgram():
 
-while True:
-    points = generate_random_points(300)
-    canvas_width, canvas_height = calculate_canvas_size(points)
-    appFunction(points, canvas_width, canvas_height, executionTime)
-    user_input_app = input("More data? (y/n): ").strip().lower()
-    if user_input_app == 'n':
-        break
-    else:
-        executionTime += 1
-        print(f"Execution time incremented to {executionTime}\n")
+    executionTime = 1
+
+    while True:
+        points = generate_random_points(300)
+        canvas_width, canvas_height = calculate_canvas_size(points)
+        appFunction(points, canvas_width, canvas_height, str(executionTime))
+        user_input_app = input("More data? (y/n): ").strip().lower()
+        if user_input_app == 'n':
+            break
+        else:
+            executionTime += 1
+            print(f"Execution time incremented to {executionTime}\n")
 
 
-# Close the database connection at the end
-conn.close()
+
+mainProgram()

@@ -1,46 +1,65 @@
 import psycopg2
 
-# Establish a connection to your PostgreSQL database
-conn = psycopg2.connect(
-    database="rdp_storage",
-    host="localhost",
-    user="postgres",
-    password="123456",
-    port="5432"
-)
-
-def call_insert_non_simplified_points(conn, points, table_name):
-    cur = conn.cursor()
+def criar_conexao():
     try:
-        cur.callproc("insert_non_simplified_points", (points, table_name,))
-        conn.commit()
-        print("Stored procedure insert_non_simplified_points executed successfully.")
-    except psycopg2.Error as e:
-        print(f"Error calling stored procedure insert_non_simplified_points: {e}")
-    finally:
-        cur.close()
+        # Estabelece a conexão com o banco de dados PostgreSQL
+        conexao = psycopg2.connect(database="rdp_storage",
+                                   host="localhost",
+                                   user="postgres",
+                                   password="123456",
+                                   port="5432")
+        print("Conexão PostgreSQL estabelecida com sucesso.\n")
+        return conexao  # Retorna a conexão estabelecida
 
-def call_insert_simplified_points(conn, simplified_points, non_simplified_id, table_name):
-    cur = conn.cursor()
+    except psycopg2.Error as e:
+        print("Erro ao conectar ao banco de dados PostgreSQL:", e)
+        return None  # Retorna None se a conexão falhar
+
+
+def create_non_simplified_table(table_name):
     try:
-        cur.callproc("insert_simplified_points", (simplified_points, non_simplified_id, table_name,))
+        conn = criar_conexao()
+        cur = conn.cursor()
+
+        # Call the stored procedure function
+        cur.execute("SELECT create_non_simplified_table(%s)", (table_name,))
         conn.commit()
-        print("Stored procedure insert_simplified_points executed successfully.")
-    except psycopg2.Error as e:
-        print(f"Error calling stored procedure insert_simplified_points: {e}")
+
+        print(f"Table '{table_name}' created successfully.\n")
+    except (Exception, psycopg2.DatabaseError) as error:
+        print(f"Error creating table: {error}")
     finally:
-        cur.close()
+        if conn is not None:
+            conn.close()
 
-# Example usage:
-points = [(10.0, 20.0), (30.0, 40.0), (50.0, 60.0)]  # Example non-simplified points
-simplified_points = [(15.0, 25.0), (35.0, 45.0)]     # Example simplified points
+def create_simplified_table(simplified_table_name:str, non_simplified_table_name:str)->None:
+    try:
+        conn = criar_conexao()
+        cur = conn.cursor()
+        
+        # Call the stored procedure function
+        cur.execute("SELECT create_simplified_table(%s, %s)", (simplified_table_name, non_simplified_table_name))
+        conn.commit()
 
-# Prompt user to enter a custom table name
-table_name = input("Enter a name for the table: ")
+        print(f"Table '{simplified_table_name}' created successfully.\n")
+    except (Exception, psycopg2.DatabaseError) as error:
+        print(f"Error creating table: {error}")
+    finally:
+        if conn is not None:
+            conn.close()
 
-# Call the stored procedures with the custom table name
-call_insert_non_simplified_points(conn, points, table_name)
-call_insert_simplified_points(conn, simplified_points, 1, table_name)  # Assuming non_simplified_id is 1
 
-# Close the database connection at the end
-conn.close()
+if __name__ == "__main__":
+    try:
+       
+        simplified_table_name = "my_simplified_table"
+        non_simplified_table_name = "my_non_simplified_table"
+
+        # Call the procedure function to create the simplified table
+        create_non_simplified_table(non_simplified_table_name)
+        create_simplified_table(simplified_table_name, non_simplified_table_name)
+    
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        print(f"Error: {error}")
+   
