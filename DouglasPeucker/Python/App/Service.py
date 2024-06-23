@@ -1,3 +1,6 @@
+# Range -> quantidade de pontos (invervalo de pontos) 
+# Linha otimizada vs linha não otimizada (colocar legenda)
+# A ideia é conectar apenhas uma vez 
 import tkinter as tk
 import random
 import psycopg2
@@ -72,8 +75,20 @@ def create_non_simplified_table(table_name, non_simplified_points):
         conn = criar_conexao()
         cur = conn.cursor()
 
-        # Call the stored procedure function
-        cur.execute("SELECT create_non_simplified_table(%s)", (table_name,))
+        create_table_query = f"""
+        CREATE TABLE IF NOT EXISTS {table_name} (
+            id SERIAL PRIMARY KEY,
+            x FLOAT NOT NULL,
+            y FLOAT NOT NULL,
+            sequence_number INTEGER NOT NULL
+        );
+        """
+        cur.execute(create_table_query)
+        
+        insert_query = f"INSERT INTO {table_name} (x, y, sequence_number) VALUES (%s, %s, %s)"
+        for i, point in enumerate(non_simplified_points):
+            cur.execute(insert_query, (point[0], point[1], i))
+            
         conn.commit()
 
         print(f"Table '{table_name}' created successfully.")
@@ -85,19 +100,33 @@ def create_non_simplified_table(table_name, non_simplified_points):
         if conn is not None:
             conn.close()
 
-def create_simplified_table(simplified_table_name:str, non_simplified_table_name:str, simplified_points)->None:
+def create_simplified_table(simplified_table_name: str, non_simplified_table_name: str, simplified_points) -> None:
     try:
         conn = criar_conexao()
         cur = conn.cursor()
+
+        table_name = non_simplified_table_name.replace("non_simplified_points_", "simplified_points_")
         
-        # Call the stored procedure function
-        cur.execute("SELECT create_simplified_table(%s, %s)", (simplified_table_name, non_simplified_table_name))
+        # Create the table
+        create_table_query = f"""
+        CREATE TABLE IF NOT EXISTS {table_name} (
+            id SERIAL PRIMARY KEY,
+            x FLOAT NOT NULL,
+            y FLOAT NOT NULL,
+            sequence_number INTEGER NOT NULL
+        );
+        """
+        cur.execute(create_table_query)
+
+        # Insert the points
+        insert_query = f"INSERT INTO {table_name} (x, y, sequence_number) VALUES (%s, %s, %s)"
+        for i, point in enumerate(simplified_points):
+            cur.execute(insert_query, (point[0], point[1], i))
+
         conn.commit()
 
-        modified_table = non_simplified_table_name.replace("non_simplified_points_", "simplified_points_")
-
-        print(f"Table '{modified_table}' created successfully.\n")
-        print("Simplified points: \n")
+        print(f"Table '{table_name}' created successfully.")
+        print("\nSimplified points: \n")
         print(simplified_points)
     except (Exception, psycopg2.DatabaseError) as error:
         print(f"Error creating table: {error}")
@@ -174,7 +203,7 @@ def runApp():
     executionTime = 1
 
     while True:
-        dimension_str = input("\nWhat is the dimension size? ")
+        dimension_str = input("\nWhat is the canvas size? ")
         range_str = input("\nWhat is the range? ")
 
         try:
